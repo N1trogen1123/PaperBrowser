@@ -25,12 +25,24 @@ from PyQt6.QtWidgets import (
     QTabWidget,
     QMenuBar,
     QMenu,
-    QDialog
+    QDialog,
+    QTabWidget
 )
 from PyQt6.QtCore import QUrl, QTimer, QFileInfo, Qt
 from PyQt6.QtGui import QAction, QKeySequence, QPixmap, QImage
 
 
+class WebTab(QWidget):
+    def __init__(self, url):
+        super().__init__()
+        self.web_view = QWebEngineView(self)  # переименовал в web_view
+        self.web_view.load(QUrl(url))
+        
+        layout = QVBoxLayout()
+        layout.addWidget(self.web_view)
+        self.setLayout(layout)
+
+    
 class PaperBrowser(QMainWindow):
     def __init__(self):
         super().__init__()
@@ -38,12 +50,9 @@ class PaperBrowser(QMainWindow):
         # Подключаемся к существующей базе данных
         self.history_conn = sqlite3.connect("databases/history.sqlite")
 
-        self.web_view = QWebEngineView(self)
         self.progress_bar = QProgressBar()
 
         self.initUI()
-        self.connect_signals()
-        self.load_url("https://google.com")
 
     def initUI(self):
         self.setWindowTitle("Paper Browser")
@@ -59,11 +68,16 @@ class PaperBrowser(QMainWindow):
 
         self.toolbar = QToolBar()
         self.addToolBar(self.toolbar)
+        self.tabs = QTabWidget()
+        self.tabs.setTabsClosable(True)
+        self.tabs.tabCloseRequested.connect(self.close_tab)
+
+        self.create_new_tab("https://google.com")
 
         # Добавляем progress_bar в layout
         layout.addWidget(self.toolbar)
         layout.addWidget(self.progress_bar)
-        layout.addWidget(self.web_view)
+        layout.addWidget(self.tabs)
 
         self.progress_bar.setVisible(False)
 
@@ -71,20 +85,24 @@ class PaperBrowser(QMainWindow):
         self.create_toolbar()
 
     def create_actions(self):
+        #Создать вкладку
+        self.create_tab_action = QAction("+ Создать новую вкладку", self)
+        self.create_tab_action.setShortcut(QKeySequence("F1"))
+        self.create_tab_action.triggered.connect(lambda: self.create_new_tab("https://google.com"))
         # Действие "Назад"
         self.back_action = QAction("← Назад", self)
         self.back_action.setShortcut(QKeySequence("Alt+Left"))
-        self.back_action.triggered.connect(self.web_view.back)
+        self.back_action.triggered.connect(lambda: self.get_current_webview().back() if self.get_current_webview() else None)
         self.back_action.setEnabled(False)
 
         self.forward_action = QAction("Вперед →", self)
         self.forward_action.setShortcut(QKeySequence("Alt+Right"))
-        self.forward_action.triggered.connect(self.web_view.forward)
+        self.forward_action.triggered.connect(lambda: self.get_current_webview().forward() if self.get_current_webview() else None)
         self.forward_action.setEnabled(False)
 
         self.reload_action = QAction("Обновить ⟳", self)
         self.reload_action.setShortcut(QKeySequence("F5"))
-        self.reload_action.triggered.connect(self.web_view.reload)
+        self.reload_action.triggered.connect(lambda: self.get_current_webview().reload() if self.get_current_webview() else None)
 
         self.home_action = QAction("Домой ⌂", self)
         self.home_action.setShortcut(QKeySequence("Ctrl+H"))
@@ -98,7 +116,11 @@ class PaperBrowser(QMainWindow):
         self.about_project.triggered.connect(self.aboutProject)
         self.menu.addAction(self.about_project)
 
+        self.change_theme = QAction("Сменить тему")
+
+
     def create_toolbar(self):
+        self.toolbar.addAction(self.create_tab_action)
         self.toolbar.addAction(self.back_action)
         self.toolbar.addAction(self.forward_action)
         self.toolbar.addAction(self.reload_action)
@@ -118,27 +140,9 @@ class PaperBrowser(QMainWindow):
         self.update_time()
         self.toolbar.addWidget(self.time)
 
-    def connect_signals(self):
-        self.web_view.loadStarted.connect(self.on_load_started)
-        self.web_view.loadProgress.connect(self.on_load_progress)
-        self.web_view.loadFinished.connect(self.on_load_finished)
-        self.web_view.urlChanged.connect(self.on_url_changed)
-        self.web_view.titleChanged.connect(self.on_title_changed)
-
-        # Подключаем обработчик загрузки файлов
-        self.web_view.page().profile().downloadRequested.connect(
-            self.on_download_requested
-        )
-
     def update_time(self):
         current_time = datetime.datetime.now().strftime("%H:%M:%S")
         self.time.setText(current_time)
-
-    def load_url(self, url):
-        try:
-            self.web_view.load(QUrl(url))
-        except Exception as e:
-            print(f"Ошибка загрузки URL: {e}")
 
     def aboutProject(self):
         window = AboutProjectWindow()
@@ -153,33 +157,74 @@ class PaperBrowser(QMainWindow):
             url = "https://" + url
         self.load_url(url)
 
-    def go_home(self):
-        self.load_url("https://google.com")
+    def create_new_tab(self, url):
+        tab = WebTab(url)
+        index = self.tabs.addTab(tab, "Новая вкладка")
+        self.tabs.setCurrentIndex(index)
+        
+        web_view = tab.web_view
+        web_view.loadStarted.connect(lambda: self.on_load_started(web_view))
+        web_view.loadProgress.connect(self.on_load_progress)
+        web_view.loadFinished.connect(lambda: self.on_load_finished(web_view))
+        web_view.urlChanged.connect(lambda url: self.on_url_changed(url, web_view))
+        web_view.titleChanged.connect(lambda title: self.on_title_changed(title, web_view))
+        web_view.page().profile().downloadRequested.connect(self.on_download_requested)
+        
+        return tab
+    
+    def close_tab(self, index):
+        if self.tabs.count() > 1:
+            self.tabs.removeTab(index)
+        else:
+            QMessageBox.information(self, "Информация", "Нельзя закрыть последнюю вкладку")
 
-    def on_load_started(self):
+    def get_current_webview(self):
+        current_index = self.tabs.currentIndex()
+        if current_index >= 0:
+            tab = self.tabs.widget(current_index)
+            if tab:
+                return tab.web_view
+        return None
+    
+    def load_url(self, url): 
+        web_view = self.get_current_webview()
+        if web_view:
+            self.web_view.load(QUrl(url))
+
+    def go_home(self):
+        web_view = self.get_current_webview()
+        if web_view:
+            web_view.load(QUrl('https://google.com'))
+
+    def on_load_started(self, tab):
         self.progress_bar.setVisible(True)
         self.progress_bar.setValue(0)
-        self.update_navigation_buttons()
+        self.update_navigation_buttons(tab)
 
     def on_load_progress(self, progress):
         self.progress_bar.setValue(progress)
 
-    def on_load_finished(self):
+    def on_load_finished(self, tab):
         self.progress_bar.setVisible(False)
-        self.update_navigation_buttons()
+        self.update_navigation_buttons(tab)
         # Добавляем страницу в историю после загрузки
-        current_url = self.web_view.url().toString()
+        current_url = tab.url().toString()
         self.add_to_history(current_url)
 
-    def on_url_changed(self, url):
+    def on_url_changed(self, url, tab):
         self.address_bar.setText(url.toString())
-        self.update_navigation_buttons()
+        self.update_navigation_buttons(tab)
 
-    def on_title_changed(self, title):
+    def on_title_changed(self, title, tab):
         self.setWindowTitle(f"{title} - Paper Browser")
+        # Обновляем название вкладки
+        index = self.tabs.currentIndex()
+        if index >= 0:
+            tab_title = title if title else "Новая вкладка"
+            self.tabs.setTabText(index, tab_title[:30])
 
-    def update_navigation_buttons(self):
-        history = self.web_view.history()
+    def update_navigation_buttons(self, tab):
+        history = tab.history()
         self.back_action.setEnabled(history.canGoBack())
         self.forward_action.setEnabled(history.canGoForward())
 
