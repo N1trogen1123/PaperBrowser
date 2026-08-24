@@ -44,8 +44,10 @@ class WebTab(QWidget):
 
     
 class PaperBrowser(QMainWindow):
-    def __init__(self):
+    def __init__(self, is_incognito=False):
         super().__init__()
+
+        self.is_incognito = is_incognito
 
         # Подключаемся к существующей базе данных
         self.history_conn = sqlite3.connect("databases/history.sqlite")
@@ -112,7 +114,7 @@ class PaperBrowser(QMainWindow):
 
 
     def create_actions(self):
-        #Создать вкладку
+        # Создать вкладку
         self.create_tab_action = QAction("+ Создать новую вкладку", self)
         self.create_tab_action.setShortcut(QKeySequence("F1"))
         self.create_tab_action.triggered.connect(lambda: self.create_new_tab("https://google.com"))
@@ -143,7 +145,9 @@ class PaperBrowser(QMainWindow):
         self.about_project.triggered.connect(self.aboutProject)
         self.menu.addAction(self.about_project)
 
-        self.change_theme = QAction("Сменить тему")
+        self.incognito = QAction("Инкогнито")
+        self.incognito.triggered.connect(self.open_incognito)
+        self.menu.addAction(self.incognito)
 
 
     def create_toolbar(self):
@@ -243,6 +247,8 @@ class PaperBrowser(QMainWindow):
         self.update_navigation_buttons(tab)
 
     def on_title_changed(self, title, tab):
+        if self.is_incognito:
+            self.setWindowTitle(f"{title} - Paper Browser (Инкогнито)")
         self.setWindowTitle(f"{title} - Paper Browser")
         # Обновляем название вкладки
         index = self.tabs.currentIndex()
@@ -353,13 +359,15 @@ class PaperBrowser(QMainWindow):
             self.add_to_downloads(
                 download.url().toString(),
                 os.path.basename(save_path),
-                save_path,
-                "Завершено",
             )
         else:
             download.cancel()
 
     def add_to_history(self, url):
+        # Проверяет не в режиме инкогнито ли окно
+        if self.is_incognito:
+            return
+        
         """Добавляет страницу в историю с системным временем"""
         try:
             cursor = self.history_conn.cursor()
@@ -374,6 +382,9 @@ class PaperBrowser(QMainWindow):
             print(f"Ошибка при добавлении в историю: {e}")
 
     def add_to_downloads(self, file_name, save_path):
+        if self.is_incognito:
+            return
+
         """Добавляет загрузку в историю"""
         try:
             cursor = self.history_conn.cursor()
@@ -406,6 +417,9 @@ class PaperBrowser(QMainWindow):
             pass
         event.accept()
 
+    def open_incognito(self):
+        self.incognito_window = PaperBrowser(is_incognito=True)
+        self.incognito_window.show()
 
 class BrowserHistory(QMainWindow):
     """Окно для просмотра истории браузера и загрузок"""
