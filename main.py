@@ -84,6 +84,33 @@ class PaperBrowser(QMainWindow):
         self.create_actions()
         self.create_toolbar()
 
+        self.init_database()
+
+    def init_database(self):
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        db_dir = os.path.join(base_dir, "databases")
+        os.makedirs(db_dir, exist_ok=True)
+        db_path = os.path.join(db_dir, "history.sqlite")
+    
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        cursor.executescript("""
+        CREATE TABLE IF NOT EXISTS downloads_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            file TEXT NOT NULL,
+            path TEXT NOT NULL,
+            time TIMESTAMP NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS visit_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            url TEXT NOT NULL,
+            visit_time TIMESTAMP
+        );
+        """)
+        conn.commit()
+        conn.close()
+
+
     def create_actions(self):
         #Создать вкладку
         self.create_tab_action = QAction("+ Создать новую вкладку", self)
@@ -671,7 +698,7 @@ class AboutProjectWindow(QDialog):
         self.text = QLabel("""
 Суть проекта сделать простой веб-браузер для серфинга по просторам интернета.
 Браузер реализован на фреймворке PyQt6-WebEngine, который основан на движке Chromium.
-В браузере есть панель для управления страницей и историей, реализована панель через QToolBar.
+В браузере есть панель для управления вкладками и историей, реализована панель через QToolBar.
 История реализована через SQlite базу данных, запись данных и очистка истории реализована через SQL-запросы.
 Открывается история в отдельном окне в виде таблицы.
 В истории записывается время посещения сайта и URL-адрес.
