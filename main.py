@@ -124,7 +124,6 @@ class PaperBrowser(QMainWindow):
         );
         """)
         conn.commit()
-        conn.close()
 
 
     def create_actions(self):
@@ -162,6 +161,10 @@ class PaperBrowser(QMainWindow):
         self.incognito = QAction("Инкогнито")
         self.incognito.triggered.connect(self.open_incognito)
         self.menu.addAction(self.incognito)
+
+        self.new_window = QAction("Новое окно")
+        self.new_window.triggered.connect(self.create_new_window)
+        self.menu.addAction(self.new_window)
 
 
     def create_toolbar(self):
@@ -434,6 +437,10 @@ class PaperBrowser(QMainWindow):
     def open_incognito(self):
         self.incognito_window = PaperBrowser(is_incognito=True)
         self.incognito_window.show()
+    
+    def create_new_window(self):
+        self.win = PaperBrowser()
+        self.win.show()
 
 class BrowserHistory(QMainWindow):
     """Окно для просмотра истории браузера и загрузок"""
