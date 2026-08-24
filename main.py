@@ -5,7 +5,7 @@ import csv
 import os
 
 from PyQt6.QtWebEngineWidgets import QWebEngineView
-from PyQt6.QtWebEngineCore import QWebEnginePage, QWebEngineDownloadRequest
+from PyQt6.QtWebEngineCore import QWebEnginePage, QWebEngineDownloadRequest, QWebEngineProfile
 from PyQt6.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -51,6 +51,20 @@ class PaperBrowser(QMainWindow):
 
         # Подключаемся к существующей базе данных
         self.history_conn = sqlite3.connect("databases/history.sqlite")
+
+        if self.is_incognito:
+            self.profile = QWebEngineProfile("incognito", self)
+            self.profile.setPersistentStoragePath("")
+            self.profile.setPersistentCookiesPolicy(
+                QWebEngineProfile.PersistentCookiesPolicy.NoPersistentCookies
+            )
+            self.profile.setHttpCacheType(
+                QWebEngineProfile.HttpCacheType.MemoryHttpCache
+            )
+            self.setWindowTitle("🕶️ Инкогнито")
+        else:
+            self.profile = QWebEngineProfile.defaultProfile()
+            self.setWindowTitle("Paper Browser")
 
         self.progress_bar = QProgressBar()
 
@@ -220,7 +234,7 @@ class PaperBrowser(QMainWindow):
     def load_url(self, url): 
         web_view = self.get_current_webview()
         if web_view:
-            self.web_view.load(QUrl(url))
+            web_view.load(QUrl(url))
 
     def go_home(self):
         web_view = self.get_current_webview()
@@ -718,6 +732,7 @@ class AboutProjectWindow(QDialog):
 В истории записывается время посещения сайта и URL-адрес.
 Время записывается с помощью модуля datetime.
 Также имеется функция сохранить историю посещений в виде csv-таблицы.
+Можно открыть окно в режиме инкогнито.
         """)
         self.text.setWordWrap(True)
 
