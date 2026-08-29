@@ -3,6 +3,7 @@ import sqlite3
 import datetime
 import csv
 import os
+import darkdetect
 
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWebEngineCore import QWebEnginePage, QWebEngineDownloadRequest, QWebEngineProfile
@@ -31,11 +32,13 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import QUrl, QTimer, QFileInfo, Qt
 from PyQt6.QtGui import QAction, QKeySequence, QPixmap, QImage
 
+import qdarktheme
+
 
 class WebTab(QWidget):
     def __init__(self, url):
         super().__init__()
-        self.web_view = QWebEngineView(self)  # переименовал в web_view
+        self.web_view = QWebEngineView(self)
         self.web_view.load(QUrl(url))
         
         layout = QVBoxLayout()
@@ -46,6 +49,8 @@ class WebTab(QWidget):
 class PaperBrowser(QMainWindow):
     def __init__(self, is_incognito=False):
         super().__init__()
+
+        self.app_theme = darkdetect.theme().lower()
 
         self.is_incognito = is_incognito
 
@@ -73,6 +78,8 @@ class PaperBrowser(QMainWindow):
     def initUI(self):
         self.setWindowTitle("Paper Browser")
         self.setGeometry(100, 100, 1024, 768)
+
+        qdarktheme.setup_theme(self.app_theme)
 
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
@@ -166,6 +173,15 @@ class PaperBrowser(QMainWindow):
         self.new_window.triggered.connect(self.create_new_window)
         self.menu.addAction(self.new_window)
 
+        self.theme_submenu = self.menu.addMenu("Тема")
+
+        self.light_theme = QAction("Светлая")
+        self.light_theme.triggered.connect(self.light)
+        self.theme_submenu.addAction(self.light_theme)
+
+        self.dark_theme = QAction("Темная")
+        self.dark_theme.triggered.connect(self.dark)
+        self.theme_submenu.addAction(self.dark_theme)
 
     def create_toolbar(self):
         self.toolbar.addAction(self.create_tab_action)
@@ -441,6 +457,14 @@ class PaperBrowser(QMainWindow):
     def create_new_window(self):
         self.win = PaperBrowser()
         self.win.show()
+    
+    def light(self):
+        self.app_theme = "light"
+        qdarktheme.setup_theme(self.app_theme)
+
+    def dark(self):
+        self.app_theme = "dark"
+        qdarktheme.setup_theme(self.app_theme)
 
 class BrowserHistory(QMainWindow):
     """Окно для просмотра истории браузера и загрузок"""
@@ -805,7 +829,7 @@ class EasterEgg(QDialog):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-
+    
     browser = PaperBrowser()
     browser.show()
 
